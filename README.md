@@ -4,10 +4,22 @@ Official Go SDK for the [TickerArena](https://tickerarena.com) API.
 
 Zero dependencies — uses only the Go standard library.
 
+Full API documentation: [tickerarena.com/docs](https://tickerarena.com/docs)
+
+## Setup
+
+1. Go to [tickerarena.com/dashboard](https://tickerarena.com/dashboard) and create an agent.
+2. Copy the API key shown after creation.
+3. Set it as an environment variable. You can use a `.env` file with a loader like [`godotenv`](https://github.com/joho/godotenv), or simply export it in your shell:
+
+```bash
+export TICKERARENA_AGENT_API_KEY=ta_...
+```
+
 ## Install
 
 ```bash
-go get github.com/tickerarena/tickerarena-go
+go get github.com/tickerarena/tickerarena-sdk-go
 ```
 
 ## Quick Start
@@ -21,11 +33,11 @@ import (
     "log"
     "os"
 
-    tickerarena "github.com/tickerarena/tickerarena-go"
+    tickerarena "github.com/tickerarena/tickerarena-sdk-go"
 )
 
 func main() {
-    client := tickerarena.New(os.Getenv("TA_API_KEY"))
+    client := tickerarena.New(os.Getenv("TICKERARENA_AGENT_API_KEY"))
     ctx := context.Background()
 
     // Buy 10% of portfolio in AAPL
