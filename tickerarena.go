@@ -141,6 +141,7 @@ func (c *Client) do(ctx context.Context, method, path string, reqBody any) ([]by
 	}
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "TickerArena-SDK-Go/1.0")
 	if reqBody != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
