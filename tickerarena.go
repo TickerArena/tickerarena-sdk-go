@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 const defaultBaseURL = "https://tickerarena.com"
@@ -38,13 +39,15 @@ const (
 
 // TradeRequest is the body for POST /api/trade.
 type TradeRequest struct {
-	// Ticker symbol, e.g. "AAPL" or "BTC-USD".
+	// Ticker symbol, e.g. "AAPL" or "BTCUSD".
 	Ticker string `json:"ticker"`
 	// Action is one of ActionBuy, ActionSell, ActionShort, ActionCover.
 	Action TradeAction `json:"action"`
 	// Percent is 1–100. For buys/shorts: % of total portfolio.
 	// For sells/covers: % of the open position to close.
 	Percent float64 `json:"percent"`
+	// Agent targets a specific agent by name. If empty, uses the client default.
+	Agent string `json:"agent,omitempty"`
 }
 
 // TradeResponse is returned by a successful POST /api/trade.
@@ -70,6 +73,22 @@ type PortfolioResponse struct {
 	TotalAllocated float64    `json:"totalAllocated"`
 }
 
+// Agent represents a trading agent.
+type Agent struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	CreatedAt   string  `json:"createdAt"`
+}
+
+// CreateAgentRequest is the body for POST /api/agents.
+type CreateAgentRequest struct {
+	// Name is the agent name. If empty, a random name is generated.
+	Name string `json:"name,omitempty"`
+	// Description is an optional agent description.
+	Description string `json:"description,omitempty"`
+}
+
 // ─── Error ────────────────────────────────────────────────────────────────────
 
 // APIError is returned when the TickerArena API responds with a non-2xx status.
@@ -91,6 +110,7 @@ func (e *APIError) Error() string {
 // Client is the TickerArena API client.
 type Client struct {
 	apiKey     string
+	agent      string
 	baseURL    string
 	httpClient *http.Client
 }
@@ -108,9 +128,15 @@ func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) { c.httpClient = hc }
 }
 
+// WithAgent sets the default agent name for trade and portfolio calls.
+func WithAgent(name string) Option {
+	return func(c *Client) { c.agent = name }
+}
+
 // New creates a TickerArena client with the given API key.
 //
 //	client := tickerarena.New(os.Getenv("TA_API_KEY"))
+//	client := tickerarena.New(os.Getenv("TA_API_KEY"), tickerarena.WithAgent("my_bot"))
 func New(apiKey string, opts ...Option) *Client {
 	c := &Client{
 		apiKey:     apiKey,
@@ -187,6 +213,10 @@ func (c *Client) do(ctx context.Context, method, path string, reqBody any) ([]by
 //	    Percent: 10,
 //	})
 func (c *Client) Trade(ctx context.Context, req TradeRequest) (*TradeResponse, error) {
+	// Apply default agent if not specified in the request
+	if req.Agent == "" && c.agent != "" {
+		req.Agent = c.agent
+	}
 	raw, err := c.do(ctx, http.MethodPost, "/api/trade", req)
 	if err != nil {
 		return nil, err
@@ -204,8 +234,18 @@ func (c *Client) Trade(ctx context.Context, req TradeRequest) (*TradeResponse, e
 //	for _, p := range port.Positions {
 //	    fmt.Printf("%s %s %.2f%%  ROI: %.2f%%\n", p.Ticker, p.Direction, p.Allocation, p.ROIPercent)
 //	}
-func (c *Client) Portfolio(ctx context.Context) (*PortfolioResponse, error) {
-	raw, err := c.do(ctx, http.MethodGet, "/api/portfolio", nil)
+//
+// Pass an agent name to target a specific agent, or leave empty to use the client default.
+func (c *Client) Portfolio(ctx context.Context, agent ...string) (*PortfolioResponse, error) {
+	agentName := c.agent
+	if len(agent) > 0 && agent[0] != "" {
+		agentName = agent[0]
+	}
+	path := "/api/portfolio"
+	if agentName != "" {
+		path += "?agent=" + url.QueryEscape(agentName)
+	}
+	raw, err := c.do(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -214,4 +254,36 @@ func (c *Client) Portfolio(ctx context.Context) (*PortfolioResponse, error) {
 		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
 	}
 	return &resp, nil
+}
+
+// ─── Agent management ────────────────────────────────────────────────────────
+
+// Agents lists your agents.
+//
+//	agents, err := client.Agents(ctx)
+func (c *Client) Agents(ctx context.Context) ([]Agent, error) {
+	raw, err := c.do(ctx, http.MethodGet, "/api/agents", nil)
+	if err != nil {
+		return nil, err
+	}
+	var agents []Agent
+	if err := json.Unmarshal(raw, &agents); err != nil {
+		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
+	}
+	return agents, nil
+}
+
+// CreateAgent creates a new agent.
+//
+//	agent, err := client.CreateAgent(ctx, tickerarena.CreateAgentRequest{Name: "momentum_alpha"})
+func (c *Client) CreateAgent(ctx context.Context, req CreateAgentRequest) (*Agent, error) {
+	raw, err := c.do(ctx, http.MethodPost, "/api/agents", req)
+	if err != nil {
+		return nil, err
+	}
+	var agent Agent
+	if err := json.Unmarshal(raw, &agent); err != nil {
+		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
+	}
+	return &agent, nil
 }
