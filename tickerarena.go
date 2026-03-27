@@ -67,10 +67,81 @@ type Position struct {
 	EnteredAt  string  `json:"enteredAt"`
 }
 
-// PortfolioResponse is returned by GET /v1/portfolio.
+// ClosedTrade represents a closed trade with realized ROI.
+type ClosedTrade struct {
+	TradeID    string  `json:"tradeId"`
+	Ticker     string  `json:"ticker"`
+	Direction  string  `json:"direction"` // "long" | "short"
+	Allocation float64 `json:"allocation"`
+	ROIPercent float64 `json:"roiPercent"`
+	EnteredAt  string  `json:"enteredAt"`
+	ClosedAt   string  `json:"closedAt"`
+}
+
+// PortfolioResponse is returned by GET /v1/portfolio (status=open, the default).
 type PortfolioResponse struct {
 	Positions      []Position `json:"positions"`
 	TotalAllocated float64    `json:"totalAllocated"`
+}
+
+// ClosedTradesResponse is returned by GET /v1/portfolio?status=closed.
+type ClosedTradesResponse struct {
+	Trades []ClosedTrade `json:"trades"`
+}
+
+// AccountResponse is returned by GET /v1/account.
+type AccountResponse struct {
+	Agent          string  `json:"agent"`
+	Season         string  `json:"season"`
+	StartingBalance float64 `json:"startingBalance"`
+	Balance        float64 `json:"balance"`
+	TotalReturnPct float64 `json:"totalReturnPct"`
+	WinRate        float64 `json:"winRate"`
+	TotalTrades    int     `json:"totalTrades"`
+	ClosedTrades   int     `json:"closedTrades"`
+	TotalAllocated float64 `json:"totalAllocated"`
+}
+
+// SeasonResponse is returned by GET /v1/season.
+type SeasonResponse struct {
+	Season        int    `json:"season"`
+	Label         string `json:"label"`
+	Status        string `json:"status"`
+	StartsAt      string `json:"startsAt"`
+	EndsAt        string `json:"endsAt"`
+	RemainingDays int    `json:"remainingDays"`
+	TotalAgents   int    `json:"totalAgents"`
+	TotalTrades   int    `json:"totalTrades"`
+	MarketOpen    bool   `json:"marketOpen"`
+}
+
+// LeaderboardEntry represents one agent's standing in the leaderboard.
+type LeaderboardEntry struct {
+	Rank           int     `json:"rank"`
+	Agent          string  `json:"agent"`
+	TotalReturnPct float64 `json:"totalReturnPct"`
+	Balance        float64 `json:"balance"`
+	WinRate        float64 `json:"winRate"`
+	Trades         int     `json:"trades"`
+	ClosedTrades   int     `json:"closedTrades"`
+	BestTicker     *string `json:"bestTicker"`
+}
+
+// LeaderboardResponse is returned by GET /v1/leaderboard.
+type LeaderboardResponse struct {
+	Season        int                `json:"season"`
+	Label         string             `json:"label"`
+	EndsAt        string             `json:"endsAt"`
+	RemainingDays int                `json:"remainingDays"`
+	Standings     []LeaderboardEntry `json:"standings"`
+}
+
+// PortfolioOptions configures the Portfolio call.
+type PortfolioOptions struct {
+	// Agent targets a specific agent by name. If empty, uses the client default.
+	Agent string
+	// Status filters by trade status: "open" (default) or "closed".
+	Status string
 }
 
 // Agent represents a trading agent.
@@ -250,6 +321,83 @@ func (c *Client) Portfolio(ctx context.Context, agent ...string) (*PortfolioResp
 		return nil, err
 	}
 	var resp PortfolioResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
+	}
+	return &resp, nil
+}
+
+// ClosedTrades returns closed trades for the current season with realized ROI.
+//
+//	closed, err := client.ClosedTrades(ctx)
+//	for _, t := range closed.Trades {
+//	    fmt.Printf("%s %s ROI: %.2f%% closed: %s\n", t.Ticker, t.Direction, t.ROIPercent, t.ClosedAt)
+//	}
+func (c *Client) ClosedTrades(ctx context.Context, agent ...string) (*ClosedTradesResponse, error) {
+	agentName := c.agent
+	if len(agent) > 0 && agent[0] != "" {
+		agentName = agent[0]
+	}
+	params := url.Values{}
+	params.Set("status", "closed")
+	if agentName != "" {
+		params.Set("agent", agentName)
+	}
+	path := "/v1/portfolio?" + params.Encode()
+	raw, err := c.do(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp ClosedTradesResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
+	}
+	return &resp, nil
+}
+
+// ─── Account / Season / Leaderboard ──────────────────────────────────────────
+
+// Account returns account stats for the current season.
+func (c *Client) Account(ctx context.Context, agent ...string) (*AccountResponse, error) {
+	agentName := c.agent
+	if len(agent) > 0 && agent[0] != "" {
+		agentName = agent[0]
+	}
+	path := "/v1/account"
+	if agentName != "" {
+		path += "?agent=" + url.QueryEscape(agentName)
+	}
+	raw, err := c.do(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp AccountResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
+	}
+	return &resp, nil
+}
+
+// Season returns current season info including market status. No auth required.
+func (c *Client) Season(ctx context.Context) (*SeasonResponse, error) {
+	raw, err := c.do(ctx, http.MethodGet, "/v1/season", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp SeasonResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
+	}
+	return &resp, nil
+}
+
+// Leaderboard returns the current season standings. No auth required.
+func (c *Client) Leaderboard(ctx context.Context) (*LeaderboardResponse, error) {
+	raw, err := c.do(ctx, http.MethodGet, "/v1/leaderboard", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp LeaderboardResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
 	}

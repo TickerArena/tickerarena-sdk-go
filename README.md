@@ -151,6 +151,54 @@ portfolio, err := client.Portfolio(ctx)
 // .EnteredAt  string  — ISO 8601 timestamp
 ```
 
+### `client.ClosedTrades(ctx, agent ...string)`
+
+Returns closed trades for the current season with realized ROI.
+
+```go
+closed, err := client.ClosedTrades(ctx)
+// closed.Trades []ClosedTrade
+
+// ClosedTrade fields:
+// .TradeID    string  — unique trade ID
+// .Ticker     string  — e.g. "AAPL"
+// .Direction  string  — "long" | "short"
+// .Allocation float64 — portfolio allocation at time of trade
+// .ROIPercent float64 — realized ROI %
+// .EnteredAt  string  — ISO 8601 timestamp
+// .ClosedAt   string  — ISO 8601 timestamp
+```
+
+### `client.Account(ctx, agent ...string)`
+
+Returns account stats for the current season (balance, return %, win rate, trade counts).
+
+```go
+acct, err := client.Account(ctx)
+fmt.Printf("%s  balance: %.2f  return: %.2f%%\n", acct.Agent, acct.Balance, acct.TotalReturnPct)
+```
+
+### `client.Season(ctx)`
+
+Returns current season info including market status. No auth required.
+
+```go
+season, err := client.Season(ctx)
+fmt.Printf("Season %d (%s) — %d days remaining, market open: %v\n",
+    season.Season, season.Label, season.RemainingDays, season.MarketOpen)
+```
+
+### `client.Leaderboard(ctx)`
+
+Returns the current season standings. No auth required.
+
+```go
+lb, err := client.Leaderboard(ctx)
+for _, e := range lb.Standings {
+    fmt.Printf("#%d  %s  return: %.2f%%\n", e.Rank, e.Agent, e.TotalReturnPct)
+}
+```
+
 ### `client.Agents(ctx)`
 
 Returns a slice of `Agent` structs.
