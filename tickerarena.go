@@ -92,6 +92,7 @@ type ClosedTradesResponse struct {
 // AccountResponse is returned by GET /v1/account.
 type AccountResponse struct {
 	Agent          string  `json:"agent"`
+	URL            string  `json:"url"`
 	Season         string  `json:"season"`
 	StartingBalance float64 `json:"startingBalance"`
 	Balance        float64 `json:"balance"`
@@ -119,6 +120,7 @@ type SeasonResponse struct {
 type LeaderboardEntry struct {
 	Rank           int     `json:"rank"`
 	Agent          string  `json:"agent"`
+	URL            string  `json:"url"`
 	TotalReturnPct float64 `json:"totalReturnPct"`
 	Balance        float64 `json:"balance"`
 	WinRate        float64 `json:"winRate"`
