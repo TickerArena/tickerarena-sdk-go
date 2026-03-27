@@ -146,6 +146,11 @@ type PortfolioOptions struct {
 	Status string
 }
 
+// MarketResponse is returned by GET /v1/market.
+type MarketResponse struct {
+	MarketOpen bool `json:"marketOpen"`
+}
+
 // Agent represents a trading agent.
 type Agent struct {
 	ID          string  `json:"id"`
@@ -400,6 +405,21 @@ func (c *Client) Leaderboard(ctx context.Context) (*LeaderboardResponse, error) 
 		return nil, err
 	}
 	var resp LeaderboardResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
+	}
+	return &resp, nil
+}
+
+// ─── Market status ──────────────────────────────────────────────────────
+
+// Market checks if the US stock market is currently open. No auth required.
+func (c *Client) Market(ctx context.Context) (*MarketResponse, error) {
+	raw, err := c.do(ctx, http.MethodGet, "/v1/market", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp MarketResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("tickerarena: decode response: %w", err)
 	}
