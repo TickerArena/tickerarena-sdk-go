@@ -23,7 +23,7 @@ import (
 	"net/url"
 )
 
-const defaultBaseURL = "https://tickerarena.com"
+const defaultBaseURL = "https://api.tickerarena.com"
 
 // TradeAction is the direction of a trade.
 type TradeAction string
@@ -37,7 +37,7 @@ const (
 
 // ─── Request / Response types ─────────────────────────────────────────────────
 
-// TradeRequest is the body for POST /api/trade.
+// TradeRequest is the body for POST /trade.
 type TradeRequest struct {
 	// Ticker symbol, e.g. "AAPL" or "BTCUSD".
 	Ticker string `json:"ticker"`
@@ -50,7 +50,7 @@ type TradeRequest struct {
 	Agent string `json:"agent,omitempty"`
 }
 
-// TradeResponse is returned by a successful POST /api/trade.
+// TradeResponse is returned by a successful POST /trade.
 type TradeResponse struct {
 	Code   int    `json:"code"`
 	Status string `json:"status"`
@@ -67,7 +67,7 @@ type Position struct {
 	EnteredAt  string  `json:"enteredAt"`
 }
 
-// PortfolioResponse is returned by GET /api/portfolio.
+// PortfolioResponse is returned by GET /v1/portfolio.
 type PortfolioResponse struct {
 	Positions      []Position `json:"positions"`
 	TotalAllocated float64    `json:"totalAllocated"`
@@ -81,7 +81,7 @@ type Agent struct {
 	CreatedAt   string  `json:"createdAt"`
 }
 
-// CreateAgentRequest is the body for POST /api/agents.
+// CreateAgentRequest is the body for POST /v1/agents.
 type CreateAgentRequest struct {
 	// Name is the agent name. If empty, a random name is generated.
 	Name string `json:"name,omitempty"`
@@ -217,7 +217,7 @@ func (c *Client) Trade(ctx context.Context, req TradeRequest) (*TradeResponse, e
 	if req.Agent == "" && c.agent != "" {
 		req.Agent = c.agent
 	}
-	raw, err := c.do(ctx, http.MethodPost, "/api/trade", req)
+	raw, err := c.do(ctx, http.MethodPost, "/v1/trade", req)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +241,7 @@ func (c *Client) Portfolio(ctx context.Context, agent ...string) (*PortfolioResp
 	if len(agent) > 0 && agent[0] != "" {
 		agentName = agent[0]
 	}
-	path := "/api/portfolio"
+	path := "/v1/portfolio"
 	if agentName != "" {
 		path += "?agent=" + url.QueryEscape(agentName)
 	}
@@ -262,7 +262,7 @@ func (c *Client) Portfolio(ctx context.Context, agent ...string) (*PortfolioResp
 //
 //	agents, err := client.Agents(ctx)
 func (c *Client) Agents(ctx context.Context) ([]Agent, error) {
-	raw, err := c.do(ctx, http.MethodGet, "/api/agents", nil)
+	raw, err := c.do(ctx, http.MethodGet, "/v1/agents", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func (c *Client) Agents(ctx context.Context) ([]Agent, error) {
 //
 //	agent, err := client.CreateAgent(ctx, tickerarena.CreateAgentRequest{Name: "momentum_alpha"})
 func (c *Client) CreateAgent(ctx context.Context, req CreateAgentRequest) (*Agent, error) {
-	raw, err := c.do(ctx, http.MethodPost, "/api/agents", req)
+	raw, err := c.do(ctx, http.MethodPost, "/v1/agents", req)
 	if err != nil {
 		return nil, err
 	}
